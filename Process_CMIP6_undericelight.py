@@ -56,7 +56,7 @@ args = proj.Proj(proj="aeqd", lat_0=90, lon_0=0, datum="WGS84", units="m")
 
 crs_wgs = proj.Proj(init='epsg:4326')  # assuming you're using WGS84 geographic
 
-
+#%% LOAD Function
 def regrid(data_in,
            lon_in,
            lat_in,
@@ -75,7 +75,13 @@ def regrid(data_in,
     
     return(output)
 
-def plot(data,latsy,lonsx,label):
+#%% LOAD Function
+def plot(data,latsy,lonsx,string):
+    minv=data.min()
+    maxv=data.max()
+    if string == 'siflswutop':
+        label_unit='W/m2'
+    print('inside plot routine ',latsy.shape,lonsx.shape,data.shape)
     lat_0 = 90 # Latitude of Origin
     lon_0 = -45 # Central Meridian
 #bbox = [45,-180.,90,180.] # Bounding Box
@@ -88,13 +94,13 @@ def plot(data,latsy,lonsx,label):
     mp.drawparallels(np.arange(-80.,81.,20.))
     mp.drawmeridians(np.arange(-180.,181.,20.))
     mp.drawmapboundary(fill_color='white')   
-    cf1 = mp.contourf(lonsx, latsy, data, np.arange(0,1.1,0.1), latlon=True, cmap=plt.cm.viridis, extend='both')
+    cf1 = mp.contourf(lonsx, latsy, data, np.arange(minv,maxv,(maxv-minv)/10.), latlon=True, cmap=plt.cm.viridis, extend='both')
 # Add an annotation for each sub-plot
     box = dict(boxstyle='square,pad=0.3',fc='white',ec='white',lw=0.5) # white rectangle with white outline
-    ax.annotate(title[0], xy=(0.02,0.96), xycoords='axes fraction', va='top', ha= 'left', size=8, bbox=box)
+    ax.annotate(string, xy=(0.02,0.96), xycoords='axes fraction', va='top', ha= 'left', size=8, bbox=box)
 # # The above adds text plotted on top of the white box located in the upper-left corner of each map
     hc=plt.colorbar(cf1,);  
-    hc.set_label(r'label',size=12);
+    hc.set_label(label_unit,size=12);
 
 #this program will run through an emission scenario to find the models to compute under-ice light following Stroeve et al. 2021
 #the light processing component is calling a function based off of Gaelle's work
@@ -220,7 +226,6 @@ for f in models_with_all_variables:
     
     
 # now loop over all the variables per model/ensemble
-
     for ncvar in ncvarlist: #loop through each variable name
         files2open=datapath+ncvar+'_'+f
         print(files2open)
@@ -253,7 +258,9 @@ for f in models_with_all_variables:
             while i < len(ncf[ncvar]):
                 one_file=dum[i,:,:]
                 i += 1
-                plot(one_file,newlatsy,newlonsx,ncvar)
+                plot(one_file,newlats,newlons,ncvar)
+                new_data=regrid(one_file,newlats,newlons,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
+                break
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
         times=ncf['time'][:].data
         #load each part of the data for this variable
