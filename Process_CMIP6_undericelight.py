@@ -51,9 +51,161 @@ from scipy import optimize
 from scipy.interpolate import griddata
 import pyproj as proj
 
+#%% LOAD Function
+def get_under_ice_light(sic,sit,snd,alb):
+# #**********function to compute under-ice light*************
+# #************DONE GETTING ALL THE APRIL MODEL VARIABLES
+    nyears=sic.shape[0]
+    year=[]
+    big_value=1.e20
+    xdim=sic.shape[1]
+    ydim=sic.shape[2]
+    print('xdim and ydim ',xdim,ydim,nyears)
+# surface transmission parameter
+    i_0_snw  =  0.3;     # for snow 
+    i_0_bi   =  0.3;     # for ice  (may change) 
+    i_0_pond =  0.58;    # for melt pond
+    i_0_ow   =  0.58;    # for open water
+# surface transmission layer thickness (m)
+    h_0_snw  =  0.03;     # for snow 
+    h_0_bi   =  0.1;    # for bare ice ice  (may change !) 
+    alb_pond = 0.27;  # for ponded ice 
+# attenuation coeff ice    
+    K_i  = 1;
+# ITD pdf    
+    hpdf = [0.0646, 0.1415, 0.173, 0.1272, 0.1114, 0.0824, 0.0665, \
+        0.0541, 0.0429, 0.0347, 0.0287, 0.024,0.0194, 0.016, 0.0136]
+    hpdf=np.asarray(hpdf)
+    for iyears in range(nyears):        ## big loop on years (could also have been on months as Gaelle did)
+        year.append(iyears+1850)
+        SIC=sic[iyears,:,:]
+        f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
+    
+
+    #### Snow depth ####
+        snod=snd[iyears,:,:]
+        h_s=reshape(snod,xdim*ydim)   #re-shape to 1D array for loop 
+    
+    #### Sea ice thickness ####
+        SIT=sit[iyears,:,:]
+        hi=reshape(SIT,xdim*ydim)
+    
+    # for zz in range (0,88*320):
+    #     if f_bi[zz]>(big_value):
+    #         f_bi[zz]=np.float('nan')
+    #     if h_s[zz]>(big_value):
+    #         h_s[zz]=np.float('nan')
+    #     if hi[zz]>(big_value):
+    #         hi[zz]=np.float('nan')
+      
+
+## ITD 15 classes ##
+    h_cutoff=3.   # maximum 3 times mean ice thickness       
+    hi15=np.zeros([xdim*ydim,15]) ## ice thickness distributed
+    for ii in range (1,16):
+        factor2=(2*ii - 1)/15.    ## factor for distribution
+        hi15[:,ii-1]=hi*factor2     
+        hi15[:,ii-1]=(h_cutoff/2.)*hi15[:,ii-1] ## h_cutoff vary with the SIC distributed
+
+    #### albedo and incoming solar #### 
+        ALB=alb[iyears,:,:]
+        alb=reshape(ALB,xdim*ydim)
+
+    #### Incoming solar irradiance ####
+        FSW0=swd_april[iyears,:,:]
+        Fsw0=reshape(FSW0,xdim*ydim)
+
+
+# initialisation arrays transmittance, irradiance    
+        T_ow=np.zeros(xdim*ydim)
+        T_snow=np.zeros(xdim*ydim)
+        Fsw_tr_new=np.zeros([xdim*ydim,16])
+# hs array between 0 and 2 times mean snow depth
+        hs=np.arange(0.,2.*nanmax(h_s),0.05)
+# initialisation snow attenuation coeff
+        K_s=np.zeros([len(hs),88*320])
+
+# initialisation intermediate steps
+        f_att_snow=np.zeros([88*320,len(hs),15])
+        i_s_hom=np.zeros([88*320,16])
+        t_s_hom=np.zeros([88*320,16])
+
+    #loops on ITD and assign K_s according to wet/dry snow
+        for jj in range(0,15): 
+            for ii in range (0,xdim*ydim):
+                for kk in range(0,len(hs)):
+#                   if temp[ii] <= 0:   # dry snow
+                    K_s[kk,ii] = 10;
+                    f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]-h_0_snw))* exp(-K_i*hi15[ii,jj]) ;
+                    # elif hs[kk]<=0.03:  # if snow depth < SSL thickness
+                    if hs[kk]<=0.03:  # if snow depth < SSL thickness
+                        K_s[kk,ii] = 40; 
+                        f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]))* exp(-K_i*hi15[ii,jj]) ;
+                        # else:
+                        #     K_s[kk,ii]=7;   # wet snow
+                        #     f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]-h_0_snw))* exp(-K_i*hi15[ii,jj]) ;
+        
+            index=where(f_att_snow>1)
+            f_att_snow[index]=1
+        
+        
+            for ii in range (0,xdim*ydim):
+                # distribution snow depth 
+                g_hs = zeros([len(hs)]) ; 
+                g_hs[where(hs  < 2.0 * h_s[ii])]  = f_bi[ii] / ( 2.0 * h_s[ii] );
+                i_s_hom[ii,jj] = sum(g_hs * 0.01 * f_att_snow[ii,:,jj]); # integrated transmission
+                for kk in range (0,len(hs)):
+                    # computing transmittance
+                    if K_s[kk,ii]==40:
+                        t_s_hom[ii,jj] = ((1-alb[ii]) * i_s_hom[ii,jj]) / f_bi[ii] ;
+                    else: 
+                        t_s_hom[ii,jj] = ((1-alb[ii]) * i_0_snw * i_s_hom[ii,jj]) / f_bi[ii] ;     
+                
+                T_ow[ii]     = (1 - alb[ii]);  ## transmittance open water
+                # under-ice irradiance and PAR calculation
+                Fsw_tr_new[ii,jj] = Fsw0[ii]* ((t_s_hom[ii,jj] * f_bi[ii]*3.51) + (T_ow[ii] * (1-f_bi[ii]))*2.30); 
+        
+# sum ITD 15 classes and apply pdf   
+    
+        for i in range (0,xdim*ydim): 
+            t_s_hom[i,15]=sum(t_s_hom[i,0:15]*hpdf[0:15])
+            Fsw_tr_new[i,15]=sum(Fsw_tr_new[i,0:15]*hpdf[0:15])
+
+        print('Mean under-ice PAR = ')
+        print(nanmean(Fsw_tr_new[:,15]))
+        sys.stdout.flush()    
+
+# change shape to 2D array for map plotting
+    
+        T_snow=np.zeros([xdim,ydim])
+        Fsw_TR_NEW=np.zeros([xdim,ydim])  #under-ice PAR
+        c=-1
+        for ii in range (0,xdim):
+            for jj in range (0,ydim):
+                c=c+1
+                T_snow[ii,jj]=t_s_hom[c,15]
+                Fsw_TR_NEW[ii,jj]=Fsw_tr_new[c,15]
+
+        #T_snow=flipud(T_snow)
+        #Fsw_TR_NEW=flipud(Fsw_TR_NEW)
+
+    
+        c=-1
+        H_S=np.zeros([xdim,ydim])
+        for ii in range (0,xdim):
+            for jj in range (0,ydim):
+                c=c+1
+                H_S[ii,jj]=h_s[c]
+    
+#   use mask on transmittance and under ice PAR using snow depth
+    Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
+    T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
+    
+    return(Fsw_TR_NEW,T_snow)
+    
+    
 #function to regrid data to the same grid (this is a problem for the incoming and outgoing solar radiation fields)
 args = proj.Proj(proj="aeqd", lat_0=90, lon_0=0, datum="WGS84", units="m")
-
 crs_wgs = proj.Proj(init='epsg:4326')  # assuming you're using WGS84 geographic
 
 #%% LOAD Function
@@ -86,6 +238,8 @@ def plot(data,latsy,lonsx,string):
         
     elif string == 'siconc':
         label_unit=' %'
+        # minv=0.
+        # maxv=1.
     elif string == 'sithick' or string == 'sisnthick':
         label_unit='m'
         minv=0.0
@@ -122,6 +276,7 @@ minlat=45 # in degrees sets the minimum latitude limit
 #variables needed for each model name
 ncvarlist=['siconc','sithick','sisnthick','siflswutop','siflswdtop']
 experiment=['historical','ssp126','ssp585']
+months=['April','May','June','July','August','September','October']
 
 #get model names from .csv file
 filenames=pd.read_csv(filepath+'CMIP6_modelnames.csv',header='infer')
@@ -293,13 +448,14 @@ for f in models_with_all_variables:
         #load each part of the data for this variable
         # ncparts.append(ncf[ncvar][:,irows].data)
         ncparts.append(one_file[:,irows])
-    output.append( np.concatenate(ncparts) ) #append the entire 3-D array of this variable to the main empty list
-#    break
+        output.append( np.concatenate(ncparts) ) #append the entire 3-D array of this variable to the main empty list
+ 
 
 #separate list into components
-    sic,sit,snd,swu,swd=output[0]/100., output[1], output[2], output[3], output[4] #note here we converted SIC to 0-1 instead of %
+    sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
 #first let's test this for the month of April
-    sic_april=sic[3::12,:,:] #start at month index of 3 (april) and skip every 12th value
+    
+    sic_april=sic[3::12,:,:]/100. #start at month index of 3 (april) and skip every 12th value
     sit_april=sit[3::12,:,:]
     snd_april=snd[3::12,:,:]
     swu_april=swu[3::12,:,:]
@@ -310,159 +466,27 @@ for f in models_with_all_variables:
     snd_april[snd_april>big_value]=np.nan
     sic_april[sic_april>big_value]=np.nan
     alb_april=swu_april/swd_april 
-    plot(alb_april,lats,lons,'alb')
-
+    get_under_ice_light(sic_april,sit_april,snd_april,alb_april)
+    
     break
-
-#%% LOAD Function
-def get_under_ice_light(sic,sit,snd,alb)""
-# #**********function to compute under-ice light*************
-# #************DONE GETTING ALL THE APRIL MODEL VARIABLES
-    nyears=sic.shape[0]
-    year=[]
-    big_value=1.e20
-    xdim=sic.shape[1]
-    ydim=sic.shape[2]
-
-# surface transmission parameter
-    i_0_snw  =  0.3;     # for snow 
-    i_0_bi   =  0.3;     # for ice  (may change) 
-    i_0_pond =  0.58;    # for melt pond
-    i_0_ow   =  0.58;    # for open water
-# surface transmission layer thickness (m)
-    h_0_snw  =  0.03;     # for snow 
-    h_0_bi   =  0.1;    # for bare ice ice  (may change !) 
-    alb_pond = 0.27;  # for ponded ice 
-# attenuation coeff ice    
-    K_i  = 1;
-# ITD pdf    
-    hpdf = [0.0646, 0.1415, 0.173, 0.1272, 0.1114, 0.0824, 0.0665, \
-        0.0541, 0.0429, 0.0347, 0.0287, 0.024,0.0194, 0.016, 0.0136]
-    hpdf=np.asarray(hpdf)
-    for iyears in range(nyears):        ## big loop on years (could also have been on months as Gaelle did)
-        year.append(iyears+1850)
-        SIC=sic[iyears,:,:]
-        f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
-    
-
-    #### Snow depth ####
-        snod=snd[iyears,:,:]
-        h_s=reshape(snod,xdim*ydim)   #re-shape to 1D array for loop 
-    
-    #### Sea ice thickness ####
-        SIT=sit[iyears,:,:]
-        hi=reshape(SIT,xdim*ydim)
-    
-    # for zz in range (0,88*320):
-    #     if f_bi[zz]>(big_value):
-    #         f_bi[zz]=np.float('nan')
-    #     if h_s[zz]>(big_value):
-    #         h_s[zz]=np.float('nan')
-    #     if hi[zz]>(big_value):
-    #         hi[zz]=np.float('nan')
-      
-
-## ITD 15 classes ##
-    h_cutoff=3.   # maximum 3 times mean ice thickness       
-    hi15=np.zeros([xdim*ydim,15]) ## ice thickness distributed
-    for ii in range (1,16):
-        factor2=(2*ii - 1)/15.    ## factor for distribution
-        hi15[:,ii-1]=hi*factor2     
-        hi15[:,ii-1]=(h_cutoff/2.)*hi15[:,ii-1] ## h_cutoff vary with the SIC distributed
-
-    #### albedo and incoming solar #### 
-        ALB=alb[iyears,:,:]
-        alb=reshape(ALB,xdim*ydim)
-
-    #### Incoming solar irradiance ####
-        FSW0=swd_april[iyears,:,:]
-        Fsw0=reshape(FSW0,xdim*ydim)
-
-
-# initialisation arrays transmittance, irradiance    
-        T_ow=np.zeros(xdim*ydim)
-        T_snow=np.zeros(xdim*ydim)
-        Fsw_tr_new=np.zeros([xdim*ydim,16])
-# hs array between 0 and 2 times mean snow depth
-        hs=np.arange(0.,2.*nanmax(h_s),0.05)
-# initialisation snow attenuation coeff
-        K_s=np.zeros([len(hs),88*320])
-
-# initialisation intermediate steps
-        f_att_snow=np.zeros([88*320,len(hs),15])
-        i_s_hom=np.zeros([88*320,16])
-        t_s_hom=np.zeros([88*320,16])
-
-    #loops on ITD and assign K_s according to wet/dry snow
-        for jj in range(0,15): 
-            for ii in range (0,xdim*ydim):
-                for kk in range(0,len(hs)):
-#                   if temp[ii] <= 0:   # dry snow
-                    K_s[kk,ii] = 10;
-                    f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]-h_0_snw))* exp(-K_i*hi15[ii,jj]) ;
-                    # elif hs[kk]<=0.03:  # if snow depth < SSL thickness
-                    if hs[kk]<=0.03:  # if snow depth < SSL thickness
-                        K_s[kk,ii] = 40; 
-                        f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]))* exp(-K_i*hi15[ii,jj]) ;
-                        # else:
-                        #     K_s[kk,ii]=7;   # wet snow
-                        #     f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]-h_0_snw))* exp(-K_i*hi15[ii,jj]) ;
+    # imon=3
+    # for imon in range(len(months)):
+    #     sic_mon=sic[imon::12,:,:]/100.
+    #     sit_mon=sit[imon::12,:,:]
+    #     snd_mon=snd[imon::12,:,:]
+    #     swu_mon=swu[imon::12,:,:]
+    #     swd_mon=swd[imon::12,:,:]
+    #     swd_mon[swd_mon>big_value]=np.nan #set big values to Nan
+    #     swu_mon[swu_mon>big_value]=0.
+    #     sit_mon[sit_mon>big_value]=np.nan
+    #     snd_mon[snd_mon>big_value]=np.nan
+    #     sic_mon[sic_mon>big_value]=np.nan
+    #     alb_mon=swu_mon/swd_mon 
+    #     get_under_ice_light(sic_mon,sit_mon,snd_mon,alb_mon)
+    #     imon +=1
         
-            index=where(f_att_snow>1)
-            f_att_snow[index]=1
-        
-        
-            for ii in range (0,xdim*ydim):
-                # distribution snow depth 
-                g_hs = zeros([len(hs)]) ; 
-                g_hs[where(hs  < 2.0 * h_s[ii])]  = f_bi[ii] / ( 2.0 * h_s[ii] );
-                i_s_hom[ii,jj] = sum(g_hs * 0.01 * f_att_snow[ii,:,jj]); # integrated transmission
-                for kk in range (0,len(hs)):
-                    # computing transmittance
-                    if K_s[kk,ii]==40:
-                        t_s_hom[ii,jj] = ((1-alb[ii]) * i_s_hom[ii,jj]) / f_bi[ii] ;
-                    else: 
-                        t_s_hom[ii,jj] = ((1-alb[ii]) * i_0_snw * i_s_hom[ii,jj]) / f_bi[ii] ;     
-                
-                T_ow[ii]     = (1 - alb[ii]);  ## transmittance open water
-                # under-ice irradiance and PAR calculation
-                Fsw_tr_new[ii,jj] = Fsw0[ii]* ((t_s_hom[ii,jj] * f_bi[ii]*3.51) + (T_ow[ii] * (1-f_bi[ii]))*2.30); 
-        
-# sum ITD 15 classes and apply pdf   
-    
-        for i in range (0,xdim*ydim): 
-            t_s_hom[i,15]=sum(t_s_hom[i,0:15]*hpdf[0:15])
-            Fsw_tr_new[i,15]=sum(Fsw_tr_new[i,0:15]*hpdf[0:15])
 
-        print('Mean under-ice PAR = ')
-        print(nanmean(Fsw_tr_new[:,15]))
-        sys.stdout.flush()    
 
-# change shape to 2D array for map plotting
-    
-        T_snow=np.zeros([xdim,ydim])
-        Fsw_TR_NEW=np.zeros([xdim,ydim])  #under-ice PAR
-        c=-1
-        for ii in range (0,xdim):
-            for jj in range (0,ydim):
-                c=c+1
-                T_snow[ii,jj]=t_s_hom[c,15]
-                Fsw_TR_NEW[ii,jj]=Fsw_tr_new[c,15]
-
-        #T_snow=flipud(T_snow)
-        #Fsw_TR_NEW=flipud(Fsw_TR_NEW)
-
-    
-        c=-1
-        H_S=np.zeros([xdim,ydim])
-        for ii in range (0,xdim):
-            for jj in range (0,ydim):
-                c=c+1
-                H_S[ii,jj]=h_s[c]
-    
-# #   use mask on transmittance and under ice PAR using snow depth
-#     Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
-#     T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
 
 
 # #   mapping under ice PAR
