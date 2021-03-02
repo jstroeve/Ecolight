@@ -9,13 +9,14 @@ Created on Wed Feb 17 11:29:04 2021
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from netCDF4 import Dataset, num2date
+
 import netCDF4 as nc
+from netCDF4 import Dataset, num2date
 import numpy as np
-import csv
-import glob
-from pathlib import Path
-from io import StringIO
+# import csv
+# import glob
+# from pathlib import Path
+# from io import StringIO
 import os
 import sys
 sys.path.insert(0,'/anaconda2/pkgs')
@@ -25,7 +26,7 @@ import xarray as xr
 import cartopy.crs as ccrs
 
 import numpy.ma as ma
-from cftime import num2date, date2num
+#from cftime import num2date, date2num
 import matplotlib.pyplot as plt
 from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
@@ -52,7 +53,7 @@ from scipy.interpolate import griddata
 import pyproj as proj
 
 #%% LOAD Function
-def get_under_ice_light(sic,sit,snd,alb,modelname):
+def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
 # #**********function to compute under-ice light*************
 
     nyears=sic.shape[0]
@@ -157,8 +158,10 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
                 T_ow[ii]     = (1 - alb[ii]);  ## transmittance open water
                 # under-ice irradiance and PAR calculation
                 Fsw_tr_new[ii,jj] = Fsw0[ii]* ((t_s_hom[ii,jj] * f_bi[ii]*3.51) + (T_ow[ii] * (1-f_bi[ii]))*2.30); 
+               
         
-# sum ITD 15 classes and apply pdf      
+# sum ITD 15 classes and apply pdf 
+        
         for i in range (0,xdim*ydim): 
             t_s_hom[i,15]=sum(t_s_hom[i,0:15]*hpdf[0:15])
             Fsw_tr_new[i,15]=sum(Fsw_tr_new[i,0:15]*hpdf[0:15])
@@ -192,8 +195,8 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
 #   use mask on transmittance and under ice PAR using snow depth
             Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
             T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
-        plot(Fsw_TR_NEW,lats,lons,'PAR')
-        plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+year)
+        plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
+        plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+string(year))
     
     return(Fsw_TR_NEW,T_snow)
     
@@ -225,10 +228,10 @@ def regrid(data_in,
 def plot(data,latsy,lonsx,string):
     minv=data.min()
     maxv=data.max()
-    cmap1=plt.cm.jet
-    cmap1.set_bad('white')
-    cmap2=plt.cm.bwr
-    cmap2.set_bad('white')
+    # cmap1=plt.cm.jet
+    # cmap1.set_bad('white')
+    # cmap2=plt.cm.bwr
+    # cmap2.set_bad('white')
     
 #     cmap2=plt.cm.bwr
 #     cmap2.set_bad('white')
@@ -448,8 +451,11 @@ for f in models_with_all_variables:
                 break
         # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
-        times=ncf['time'][:].data
-        time_units=num2date(times)
+        # times=ncf['time'][:].data
+        time=ncf.variables['time']
+        time_convert=num2date(time[:],time.units, time.calendar)
+    
+       
 
         #load each part of the data for this variable
         # ncparts.append(ncf[ncvar][:,irows].data)
@@ -472,7 +478,7 @@ for f in models_with_all_variables:
     snd_april[snd_april>big_value]=np.nan
     sic_april[sic_april>big_value]=np.nan
     alb_april=swu_april/swd_april 
-    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,f)
+    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,latsy,lonsx,f)
     
     
     break
