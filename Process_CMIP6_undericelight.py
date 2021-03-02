@@ -80,6 +80,7 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
         year.append(iyears+1850)
         SIC=sic[iyears,:,:]
         f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
+        
     
 
     #### Snow depth ####
@@ -89,15 +90,7 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
     #### Sea ice thickness ####
         SIT=sit[iyears,:,:]
         hi=reshape(SIT,xdim*ydim)
-    
-    # for zz in range (0,88*320):
-    #     if f_bi[zz]>(big_value):
-    #         f_bi[zz]=np.float('nan')
-    #     if h_s[zz]>(big_value):
-    #         h_s[zz]=np.float('nan')
-    #     if hi[zz]>(big_value):
-    #         hi[zz]=np.float('nan')
-      
+        
 
 ## ITD 15 classes ##
     h_cutoff=3.   # maximum 3 times mean ice thickness       
@@ -123,12 +116,12 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
 # hs array between 0 and 2 times mean snow depth
         hs=np.arange(0.,2.*nanmax(h_s),0.05)
 # initialisation snow attenuation coeff
-        K_s=np.zeros([len(hs),88*320])
+        K_s=np.zeros([len(hs),xdim*ydim])
 
 # initialisation intermediate steps
-        f_att_snow=np.zeros([88*320,len(hs),15])
-        i_s_hom=np.zeros([88*320,16])
-        t_s_hom=np.zeros([88*320,16])
+        f_att_snow=np.zeros([xdim*ydim,len(hs),15])
+        i_s_hom=np.zeros([xdim*ydim,16])
+        t_s_hom=np.zeros([xdim*ydim,16])
 
     #loops on ITD and assign K_s according to wet/dry snow
         for jj in range(0,15): 
@@ -165,8 +158,7 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
                 # under-ice irradiance and PAR calculation
                 Fsw_tr_new[ii,jj] = Fsw0[ii]* ((t_s_hom[ii,jj] * f_bi[ii]*3.51) + (T_ow[ii] * (1-f_bi[ii]))*2.30); 
         
-# sum ITD 15 classes and apply pdf   
-    
+# sum ITD 15 classes and apply pdf      
         for i in range (0,xdim*ydim): 
             t_s_hom[i,15]=sum(t_s_hom[i,0:15]*hpdf[0:15])
             Fsw_tr_new[i,15]=sum(Fsw_tr_new[i,0:15]*hpdf[0:15])
@@ -198,10 +190,10 @@ def get_under_ice_light(sic,sit,snd,alb,modelname):
                 H_S[ii,jj]=h_s[c]
     
 #   use mask on transmittance and under ice PAR using snow depth
-    Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
-    T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
-    plot(Fsw_TR_NEW,lats,lons,'PAR')
-    plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+year)
+            Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
+            T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
+        plot(Fsw_TR_NEW,lats,lons,'PAR')
+        plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+year)
     
     return(Fsw_TR_NEW,T_snow)
     
@@ -454,7 +446,7 @@ for f in models_with_all_variables:
                 new_data=regrid(one_year,newlats,newlons,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
                 array_to_fill[i]=new_data
                 break
-        plot(one_year,lats,lons,ncvar)
+        # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
         times=ncf['time'][:].data
         time_units=num2date(times)
