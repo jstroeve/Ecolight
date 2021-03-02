@@ -25,7 +25,7 @@ import xarray as xr
 import cartopy.crs as ccrs
 
 import numpy.ma as ma
-
+from cftime import num2date, date2num
 import matplotlib.pyplot as plt
 from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
@@ -112,7 +112,7 @@ def get_under_ice_light(sic,sit,snd,alb):
         alb=reshape(ALB,xdim*ydim)
 
     #### Incoming solar irradiance ####
-        FSW0=swd_april[iyears,:,:]
+        FSW0=swd[iyears,:,:]
         Fsw0=reshape(FSW0,xdim*ydim)
 
 
@@ -293,7 +293,7 @@ def find_files(datapath,variable):
 #we can loop through the models but we only proceed if we find files for each model name for the 5 variables
 
 #search for each file
-datapath=filepath+experiment[1]+'/'
+datapath=filepath+experiment[2]+'/'
 
 sic_files=find_files(datapath,ncvarlist[0])
 sit_files=find_files(datapath,ncvarlist[1])
@@ -350,10 +350,9 @@ def get(inpath,string):
 
 set_of_siconc_models = set(subset_sic)    
 set_of_sithick_models = set(subset_sit)
-set_of_swu_models = set(subset_swu)
-set_of_swd_models = set(subset_swd)
 set_of_snd_models = set(subset_snd)
-
+set_of_swu_models = set(subset_swu)
+set_of_swd_models = set(subset_swd) 
 #this finds a set of all models/ensemble runs that are there for each variable
 models_with_all_variables = (set_of_siconc_models & set_of_sithick_models & set_of_snd_models & set_of_swu_models & set_of_swd_models) # Find intersection of sets
 
@@ -383,6 +382,7 @@ for f in models_with_all_variables:
 #Establish Time Units                
     timeslen = get(inpath,'time')
     print('Establish time units ',timeslen)
+    time_units=[]
      
     
     
@@ -445,6 +445,8 @@ for f in models_with_all_variables:
         plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
         times=ncf['time'][:].data
+        time_units=num2date(times)
+        #break
         #load each part of the data for this variable
         # ncparts.append(ncf[ncvar][:,irows].data)
         ncparts.append(one_file[:,irows])
