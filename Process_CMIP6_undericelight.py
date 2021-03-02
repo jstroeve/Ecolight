@@ -52,9 +52,9 @@ from scipy.interpolate import griddata
 import pyproj as proj
 
 #%% LOAD Function
-def get_under_ice_light(sic,sit,snd,alb):
+def get_under_ice_light(sic,sit,snd,alb,modelname):
 # #**********function to compute under-ice light*************
-# #************DONE GETTING ALL THE APRIL MODEL VARIABLES
+
     nyears=sic.shape[0]
     year=[]
     big_value=1.e20
@@ -200,6 +200,8 @@ def get_under_ice_light(sic,sit,snd,alb):
 #   use mask on transmittance and under ice PAR using snow depth
     Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
     T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
+    plot(Fsw_TR_NEW,lats,lons,'PAR')
+    plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+year)
     
     return(Fsw_TR_NEW,T_snow)
     
@@ -231,7 +233,13 @@ def regrid(data_in,
 def plot(data,latsy,lonsx,string):
     minv=data.min()
     maxv=data.max()
-
+    cmap1=plt.cm.jet
+    cmap1.set_bad('white')
+    cmap2=plt.cm.bwr
+    cmap2.set_bad('white')
+    
+#     cmap2=plt.cm.bwr
+#     cmap2.set_bad('white')
     print('min and max of data values ',minv,maxv)
     if string == 'siflswutop' or string == 'siflswdtop':
         label_unit='W/m2'
@@ -244,6 +252,10 @@ def plot(data,latsy,lonsx,string):
         label_unit='m'
         minv=0.0
         maxv=5.0
+    elif string == 'PAR':
+        label_unit=r'$\mu mol.m^{-2}.s^{-1}$'
+        minv=0
+        maxv=12
 #    print('inside plot routine ',latsy.shape,lonsx.shape,data.shape)
     lat_0 = 90 # Latitude of Origin
     lon_0 = -45 # Central Meridian
@@ -293,7 +305,7 @@ def find_files(datapath,variable):
 #we can loop through the models but we only proceed if we find files for each model name for the 5 variables
 
 #search for each file
-datapath=filepath+experiment[2]+'/'
+datapath=filepath+experiment[1]+'/'
 
 sic_files=find_files(datapath,ncvarlist[0])
 sit_files=find_files(datapath,ncvarlist[1])
@@ -446,7 +458,7 @@ for f in models_with_all_variables:
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
         times=ncf['time'][:].data
         time_units=num2date(times)
-        #break
+
         #load each part of the data for this variable
         # ncparts.append(ncf[ncvar][:,irows].data)
         ncparts.append(one_file[:,irows])
@@ -468,7 +480,8 @@ for f in models_with_all_variables:
     snd_april[snd_april>big_value]=np.nan
     sic_april[sic_april>big_value]=np.nan
     alb_april=swu_april/swd_april 
-    get_under_ice_light(sic_april,sit_april,snd_april,alb_april)
+    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,f)
+    
     
     break
     # imon=3
