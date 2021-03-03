@@ -6,38 +6,52 @@ Created on Wed Feb 17 11:29:04 2021
 @author: stroeve
 """
 
+import sys
+sys.path.insert(0,'/anaconda2/pkgs')
 
 import pandas as pd
-#import matplotlib as mpl
-import matplotlib.pyplot as plt
+import numpy as np
+import numpy.ma as ma
+import os
+
+
 import xarray as xr
 import netCDF4 as nc
 from netCDF4 import Dataset, num2date
 
-import cftime
-# import csv
-# import glob
-# from pathlib import Path
-# from io import StringIO
-import os
-import sys
-sys.path.insert(0,'/anaconda2/pkgs')
-import string
-import xarray as xr
+#these are used for the regridding tool
+import pyproj as proj
+from scipy.interpolate import griddata
+
+#these are needed for plotting
+import matplotlib as mpl
+from mpl_toolkits.basemap import Basemap
+import matplotlib.colors as colors
+from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm2
+
+#import cftime
+
+
+
+
+
+
+
 #import xesmf as xe
 import cartopy.crs as ccrs
-import numpy.ma as ma
-from cftime import num2date, date2num
-import matplotlib.pyplot as plt
+
+#from cftime import num2date, date2num
+
 from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
 from pylab import *
 # from PIL import Image
-from mpl_toolkits.basemap import Basemap
-import matplotlib.colors as colors
-from matplotlib.colors import LinearSegmentedColormap
+
+
 # import gzip
-#import matplotlib.cm as cm2
+
 #from scipy import interpolate as sp
 #from scipy.ndimage.interpolation import zoom
 #from scipy.ndimage.interpolation import rotate
@@ -50,9 +64,9 @@ from datetime import datetime
 from scipy.stats import norm
 from matplotlib import ticker
 from scipy import optimize
-from scipy.interpolate import griddata
-import pyproj as proj
-import numpy as np
+
+
+
 
 #%% LOAD Function
 def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
@@ -438,21 +452,21 @@ for f in sorted(models_with_all_variables):
             t=one_file.shape[0]
             x=lats.shape[0]
             y=lats.shape[1]
-            array_to_fill=np.empty(t,x,y)
-            #dum=ncf[ncvar]
-            #while i < len(ncf[ncvar]):
+            array_to_fill=np.empty((t,x,y))
+            
             while i < len(one_file):
                 #one_file=dum[i,:,:]
                 one_year=one_file[i,:,:]
                 one_year=np.absolute(one_year) #for some reason MPI has negative sisflswutop and siflswdtop
-                i += 1
-#                plot(one_file,newlats,newlons,ncvar)
+                
                 newlons.shape
                 newlats.shape
                 new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
+                # print('filling new array with regridded data ',i)
                 array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
-                break
-            #one_year=array_to_fill
+                i += 1
+                # break
+#        one_file=array_to_fill
         # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
         # times=ncf['time'][:].data
