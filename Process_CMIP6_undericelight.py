@@ -8,12 +8,12 @@ Created on Wed Feb 17 11:29:04 2021
 
 
 import pandas as pd
-import matplotlib as mpl
+#import matplotlib as mpl
 import matplotlib.pyplot as plt
 import xarray as xr
 import netCDF4 as nc
 from netCDF4 import Dataset, num2date
-import numpy as np
+
 import cftime
 # import csv
 # import glob
@@ -32,26 +32,27 @@ import matplotlib.pyplot as plt
 from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
 from pylab import *
-from PIL import Image
+# from PIL import Image
 from mpl_toolkits.basemap import Basemap
 import matplotlib.colors as colors
 from matplotlib.colors import LinearSegmentedColormap
-import gzip
-import matplotlib.cm as cm2
-from scipy import interpolate as sp
-from scipy.ndimage.interpolation import zoom
-from scipy.ndimage.interpolation import rotate
+# import gzip
+#import matplotlib.cm as cm2
+#from scipy import interpolate as sp
+#from scipy.ndimage.interpolation import zoom
+#from scipy.ndimage.interpolation import rotate
 from datetime import datetime
-from scipy.stats.mstats import pearsonr
-from scipy.stats import linregress
-import scipy.stats as ss
-from matplotlib.ticker import FuncFormatter
-import matplotlib.mlab as mlab
+#from scipy.stats.mstats import pearsonr
+#from scipy.stats import linregress
+#import scipy.stats as ss
+#from matplotlib.ticker import FuncFormatter
+#import matplotlib.mlab as mlab
 from scipy.stats import norm
 from matplotlib import ticker
 from scipy import optimize
 from scipy.interpolate import griddata
 import pyproj as proj
+import numpy as np
 
 #%% LOAD Function
 def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
@@ -367,6 +368,7 @@ models_with_all_variables = (set_of_siconc_models & set_of_sithick_models & set_
 big_value=1.e18 
 output=[]
 
+import numpy as np
 for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
 #get the latitude/longitude using the first file from the siconc to set the latitude/longitude
@@ -436,7 +438,7 @@ for f in sorted(models_with_all_variables):
             t=one_file.shape[0]
             x=lats.shape[0]
             y=lats.shape[1]
-            #array_to_fill=np.empty(t,x,y)
+            array_to_fill=np.empty(t,x,y)
             #dum=ncf[ncvar]
             #while i < len(ncf[ncvar]):
             while i < len(one_file):
@@ -448,7 +450,7 @@ for f in sorted(models_with_all_variables):
                 newlons.shape
                 newlats.shape
                 new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
-                one_file[i,:,:]=new_data #now reassign the one_year data back to the regridded data
+                array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
                 break
             #one_year=array_to_fill
         # plot(one_year,lats,lons,ncvar)
