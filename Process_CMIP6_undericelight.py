@@ -6,13 +6,15 @@ Created on Wed Feb 17 11:29:04 2021
 @author: stroeve
 """
 
+
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-
+import xarray as xr
 import netCDF4 as nc
 from netCDF4 import Dataset, num2date
 import numpy as np
+import cftime
 # import csv
 # import glob
 # from pathlib import Path
@@ -24,9 +26,8 @@ import string
 import xarray as xr
 #import xesmf as xe
 import cartopy.crs as ccrs
-
 import numpy.ma as ma
-#from cftime import num2date, date2num
+from cftime import num2date, date2num
 import matplotlib.pyplot as plt
 from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
@@ -196,7 +197,7 @@ def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
             Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
             T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
         plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
-        plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+string(year))
+        plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears]))
     
     return(Fsw_TR_NEW,T_snow)
     
@@ -256,7 +257,7 @@ def plot(data,latsy,lonsx,string):
     lon_0 = -45 # Central Meridian
 #bbox = [45,-180.,90,180.] # Bounding Box
     bbox = [45,-45,45,35]
-    fig=plt.figure()
+    fig=plt.figure(figsize=(6.5,6.5))
     ax = fig.add_subplot() 
     mp = Basemap(projection='npstere',boundinglat=60,lon_0=0,resolution='l') # choice of lat, lon boundaries
     mp.fillcontinents(color='white',lake_color='white')
@@ -366,7 +367,7 @@ models_with_all_variables = (set_of_siconc_models & set_of_sithick_models & set_
 big_value=1.e18 
 output=[]
 
-for f in models_with_all_variables:
+for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
 #get the latitude/longitude using the first file from the siconc to set the latitude/longitude
     inpath=datapath+ncvarlist[0]+'_'+f
@@ -406,7 +407,6 @@ for f in models_with_all_variables:
 
         print('processing variable ',ncvar, ' ', ncf[ncvar].shape)
         one_file=ncf[ncvar]
-        # one_year=ncf[ncvar]
         one_year=one_file[0,:,:]
         #if snow is in cm, need to convert to m
         if (ncvar == 'sisnthick'):
@@ -437,7 +437,7 @@ for f in models_with_all_variables:
             t=one_file.shape[0]
             x=lats.shape[0]
             y=lats.shape[1]
-            temp_data=np.empty(t,x,y)
+            #array_to_fill=np.empty(t,x,y)
             #dum=ncf[ncvar]
             #while i < len(ncf[ncvar]):
             while i < len(one_file):
@@ -447,13 +447,15 @@ for f in models_with_all_variables:
                 i += 1
 #                plot(one_file,newlats,newlons,ncvar)
                 new_data=regrid(one_year,newlats,newlons,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
-                array_to_fill[i]=new_data
+                one_file[i,:,:]=new_data #now reassign the one_year data back to the regridded data
                 break
+            #one_year=array_to_fill
         # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])
         # times=ncf['time'][:].data
-        time=ncf.variables['time']
-        time_convert=num2date(time[:],time.units, time.calendar)
+        
+#        time=ncf.variables['time']
+#        time_convert=num2date(time[:],time.units, time.calendar)
     
        
 
