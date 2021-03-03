@@ -418,19 +418,18 @@ for f in sorted(models_with_all_variables):
             print('in test for lat/lon ',files2open)
             newlats=get(files2open,'lat')
             newlons=get(files2open,'lon')
+              
             #do this if the lats are 1-d arrays instead of 2-d
             if newlats.ndim == 1:
+                print('needing to convert to 2D array')
                 newlons, newlats = np.meshgrid(newlons,newlats)
                 newlats[(newlats > 90) | (newlats < -90)] = np.nan
                 newlons[(newlons > 360) | (newlons < -360)] = np.nan
 
 #convert lons to -180 to 180
             newlons = np.where(newlons > 180, newlons-360, newlons) # This replaces any lon greater than 180 with lons-360 (so -180 to 0)
+            
 
-            irows = np.unique(np.where((np.isfinite(newlats) == 1) & (newlats >= minlat))[0])
-            newlonsx=newlons[irows,:]
-            newlatsy=newlats[irows,:]
-            #now we need to regrid to the new lat/lons
             i=0
             #print(len(ncf[ncvar]))
             print(len(one_file))
@@ -446,7 +445,9 @@ for f in sorted(models_with_all_variables):
                 one_year=np.absolute(one_year) #for some reason MPI has negative sisflswutop and siflswdtop
                 i += 1
 #                plot(one_file,newlats,newlons,ncvar)
-                new_data=regrid(one_year,newlats,newlons,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
+                newlons.shape
+                newlats.shape
+                new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
                 one_file[i,:,:]=new_data #now reassign the one_year data back to the regridded data
                 break
             #one_year=array_to_fill
