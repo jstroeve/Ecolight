@@ -33,13 +33,6 @@ import matplotlib.cm as cm2
 
 #import cftime
 
-
-
-
-
-
-
-#import xesmf as xe
 import cartopy.crs as ccrs
 
 #from cftime import num2date, date2num
@@ -69,7 +62,7 @@ from scipy import optimize
 
 
 #%% LOAD Function
-def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
+def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname,yearstart):
 # #**********function to compute under-ice light*************
 
     nyears=sic.shape[0]
@@ -94,7 +87,7 @@ def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
         0.0541, 0.0429, 0.0347, 0.0287, 0.024,0.0194, 0.016, 0.0136]
     hpdf=np.asarray(hpdf)
     for iyears in range(nyears):        ## big loop on years (could also have been on months as Gaelle did)
-        year.append(iyears+1850)
+        year.append(iyears+yearstart)
         SIC=sic[iyears,:,:]
         f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
         
@@ -212,7 +205,8 @@ def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname):
             Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
             T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
         plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
-        plt.savefig('/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears]))
+        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
+        plt.savefig(fname,dpi=300)
     
     return(Fsw_TR_NEW,T_snow)
     
@@ -462,18 +456,26 @@ for f in sorted(models_with_all_variables):
                 newlons.shape
                 newlats.shape
                 new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
-                # print('filling new array with regridded data ',i)
+                print('filling new array with regridded data ',i)
                 array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
                 i += 1
                 # break
-#        one_file=array_to_fill
+        if (one_year.shape != lats.shape): #now replace the one_file with the regridded data if we need to convert swu and swd
+            one_file=array_to_fill
         # plot(one_year,lats,lons,ncvar)
-        ncstart=int(ncf['time'].units.strip('days since ')[0:4])
+        ncstart=int(ncf['time'].units.strip('days since ')[0:4])  #note this gives 1850 
         # times=ncf['time'][:].data
         
-#        time=ncf.variables['time']
-#        time_convert=num2date(time[:],time.units, time.calendar)
-    
+        #for some reason this num2date doesn't work though it should according to the guide docs
+        # time=ncf.variables['time']
+        # time_convert=num2date(time[:],time.units, time.calendar)
+        
+        #instead use xarray to get the start year 
+        f1=xr.open_dataset(inpath) #can just read the first file name for this
+        time=f1.time #this gives an array of all the times
+        timestart=time.values[0]
+        #extract out the year now
+        yearstart=pd.to_datetime(timestart).year
        
 
         #load each part of the data for this variable
@@ -497,7 +499,8 @@ for f in sorted(models_with_all_variables):
     snd_april[snd_april>big_value]=np.nan
     sic_april[sic_april>big_value]=np.nan
     alb_april=swu_april/swd_april 
-    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,latsy,lonsx,f)
+    model_name=f[6:35]
+    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,latsy,lonsx,model_name,yearstart)
     
     
     break
