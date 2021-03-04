@@ -204,7 +204,7 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
 #   use mask on transmittance and under ice PAR using snow depth
                 Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
                 T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
-                print('shape of the under-ice PAR ',Fsw_TR_NEW.shape)
+#                print('shape of the under-ice PAR ',Fsw_TR_NEW.shape)
                 plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
                 fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
                 plt.savefig(fname,dpi=300)
