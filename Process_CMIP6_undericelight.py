@@ -31,7 +31,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm2
 
-#import cftime
+import cftime
 
 import cartopy.crs as ccrs
 
@@ -62,7 +62,7 @@ from scipy import optimize
 
 
 #%% LOAD Function
-def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname,yearstart):
+def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
 # #**********function to compute under-ice light*************
 
     nyears=sic.shape[0]
@@ -90,7 +90,7 @@ def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname,yearstart):
         year.append(iyears+yearstart)
         SIC=sic[iyears,:,:]
         f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
-        
+        print('inside years loop for undericelight ',range(nyears),iyears,alb.shape)
     
 
     #### Snow depth ####
@@ -204,6 +204,7 @@ def get_under_ice_light(sic,sit,snd,alb,latsy,lonsx,modelname,yearstart):
 #   use mask on transmittance and under ice PAR using snow depth
             Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
             T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
+        print('shape of the under-ice PAR ',Fsw_TR_NEW.shape)
         plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
         fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
         plt.savefig(fname,dpi=300)
@@ -236,8 +237,9 @@ def regrid(data_in,
 
 #%% LOAD Function
 def plot(data,latsy,lonsx,string):
-    minv=data.min()
-    maxv=data.max()
+    #minv=data.min()
+    #maxv=data.max()
+    
     # cmap1=plt.cm.jet
     # cmap1.set_bad('white')
     # cmap2=plt.cm.bwr
@@ -245,22 +247,34 @@ def plot(data,latsy,lonsx,string):
     
 #     cmap2=plt.cm.bwr
 #     cmap2.set_bad('white')
-    print('min and max of data values ',minv,maxv)
+#    print('min and max of data values ',minv,maxv)
     if string == 'siflswutop' or string == 'siflswdtop':
         label_unit='W/m2'
+        minv=50.
+        maxv=400.
         
     elif string == 'siconc':
         label_unit=' %'
-        # minv=0.
-        # maxv=1.
-    elif string == 'sithick' or string == 'sisnthick':
+        minv=0.
+        maxv=1.
+    elif string == 'sithick':
         label_unit='m'
         minv=0.0
         maxv=5.0
+    elif string == 'sisnthick':
+        data=data*100.
+        label_unit='cm'
+        minv=0.0
+        maxv=50.0    
     elif string == 'PAR':
         label_unit=r'$\mu mol.m^{-2}.s^{-1}$'
         minv=0
         maxv=12
+    elif string == 'alb':
+        label_unit='albedo'
+        minv=0
+        maxv=1.0
+        
 #    print('inside plot routine ',latsy.shape,lonsx.shape,data.shape)
     lat_0 = 90 # Latitude of Origin
     lon_0 = -45 # Central Meridian
@@ -268,12 +282,13 @@ def plot(data,latsy,lonsx,string):
     bbox = [45,-45,45,35]
     fig=plt.figure(figsize=(6.5,6.5))
     ax = fig.add_subplot() 
-    mp = Basemap(projection='npstere',boundinglat=60,lon_0=0,resolution='l') # choice of lat, lon boundaries
+    mp = Basemap(projection='npstere',boundinglat=60,lon_0=0,resolution='l') # choice of lat, lon boundariessic
     mp.fillcontinents(color='white',lake_color='white')
     mp.drawcoastlines()
     mp.drawparallels(np.arange(-80.,81.,20.))
     mp.drawmeridians(np.arange(-180.,181.,20.))
-    mp.drawmapboundary(fill_color='white')   
+    mp.drawmapboundary(fill_color='white') 
+    print('min and max values and step ',minv,maxv,(maxv-minv)/10.)
     cf1 = mp.contourf(lonsx, latsy, data, np.arange(minv,maxv,(maxv-minv)/10.), latlon=True, cmap=plt.cm.viridis, extend='both')
 # Add an annotation for each sub-plot
     box = dict(boxstyle='square,pad=0.3',fc='white',ec='white',lw=0.5) # white rectangle with white outline
@@ -381,6 +396,7 @@ for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
 #get the latitude/longitude using the first file from the siconc to set the latitude/longitude
     inpath=datapath+ncvarlist[0]+'_'+f
+    
     lats=get(inpath,'lat')
     lons=get(inpath,'lon')
             
@@ -400,12 +416,17 @@ for f in sorted(models_with_all_variables):
 #Establish Time Units                
     timeslen = get(inpath,'time')
     print('Establish time units ',timeslen)
-    time_units=[]
-     
     
-    
-#   file_sic_open.append(ncvarlist[0]+'_'+f)
-#    print(file_sic_open)
+#for some reason this num2date doesn't work though it should according to the guide docs
+    # time=ncf.variables['time']
+    # time_convert=num2date(time[:],time.units, time.calendar)
+    #instead use xarray to get the start year 
+    f1=xr.open_dataset(inpath) #can just read the first file name for this
+    time=f1.time #this gives an array of all the times
+    timestart=time.values[0]
+    #extract out the year now
+    yearstart=pd.to_datetime(timestart).year
+          
     
     
 # now loop over all the variables per model/ensemble
@@ -414,6 +435,11 @@ for f in sorted(models_with_all_variables):
         print(files2open)
         ncparts=[]
         ncf=nc.Dataset(files2open)
+        
+        #testing with xarray
+        test=xr.open_dataset(files2open)
+        test_var=test[ncvar].values
+    
 
         print('processing variable ',ncvar, ' ', ncf[ncvar].shape)
         one_file=ncf[ncvar]
@@ -464,20 +490,9 @@ for f in sorted(models_with_all_variables):
             one_file=array_to_fill
         # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])  #note this gives 1850 
-        # times=ncf['time'][:].data
         
-        #for some reason this num2date doesn't work though it should according to the guide docs
-        # time=ncf.variables['time']
-        # time_convert=num2date(time[:],time.units, time.calendar)
         
-        #instead use xarray to get the start year 
-        f1=xr.open_dataset(inpath) #can just read the first file name for this
-        time=f1.time #this gives an array of all the times
-        timestart=time.values[0]
-        #extract out the year now
-        yearstart=pd.to_datetime(timestart).year
-       
-
+        
         #load each part of the data for this variable
         # ncparts.append(ncf[ncvar][:,irows].data)
         ncparts.append(one_file[:,irows])
@@ -488,7 +503,7 @@ for f in sorted(models_with_all_variables):
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
 #first let's test this for the month of April
     
-    sic_april=sic[3::12,:,:]/100. #start at month index of 3 (april) and skip every 12th value
+    sic_april=sic[3::12,:,:]/100. #start at month index of 3 (april) and skip every 12th value, convert to fraction
     sit_april=sit[3::12,:,:]
     snd_april=snd[3::12,:,:]
     swu_april=swu[3::12,:,:]
@@ -499,8 +514,9 @@ for f in sorted(models_with_all_variables):
     snd_april[snd_april>big_value]=np.nan
     sic_april[sic_april>big_value]=np.nan
     alb_april=swu_april/swd_april 
+    # plot(alb_april[0,:,:],latsy,lonsx,'alb')
     model_name=f[6:35]
-    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,latsy,lonsx,model_name,yearstart)
+    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,swd_april,latsy,lonsx,model_name,yearstart)
     
     
     break
