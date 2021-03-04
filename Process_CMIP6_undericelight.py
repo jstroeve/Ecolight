@@ -288,7 +288,7 @@ def plot(data,latsy,lonsx,string):
     mp.drawparallels(np.arange(-80.,81.,20.))
     mp.drawmeridians(np.arange(-180.,181.,20.))
     mp.drawmapboundary(fill_color='white') 
-    print('min and max values and step ',minv,maxv,(maxv-minv)/10.)
+#    print('min and max values and step ',minv,maxv,(maxv-minv)/10.)
     cf1 = mp.contourf(lonsx, latsy, data, np.arange(minv,maxv,(maxv-minv)/10.), latlon=True, cmap=plt.cm.viridis, extend='both')
 # Add an annotation for each sub-plot
     box = dict(boxstyle='square,pad=0.3',fc='white',ec='white',lw=0.5) # white rectangle with white outline
