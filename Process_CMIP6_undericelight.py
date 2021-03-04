@@ -148,6 +148,7 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
                             #     K_s[kk,ii]=7;   # wet snow
                             #     f_att_snow[ii,kk,jj]  = exp(-K_s[kk,ii]*(hs[kk]-h_0_snw))* exp(-K_i*hi15[ii,jj]) ;
         
+                #end loop for ii in range (0,xdim*ydim) and kk in range (0,len(hs))
                 index=where(f_att_snow>1)
                 f_att_snow[index]=1
         
@@ -167,14 +168,15 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
                     T_ow[ii]     = (1 - alb[ii]);  ## transmittance open water
                     # under-ice irradiance and PAR calculation
                     Fsw_tr_new[ii,jj] = Fsw0[ii]* ((t_s_hom[ii,jj] * f_bi[ii]*3.51) + (T_ow[ii] * (1-f_bi[ii]))*2.30); 
-               
+               #end loop for ii  in range (0,xdim*ydim)
         
 # sum ITD 15 classes and apply pdf 
-        
+            #end loop for jj in range(0,15)
             for i in range (0,xdim*ydim): 
                 t_s_hom[i,15]=sum(t_s_hom[i,0:15]*hpdf[0:15])
                 Fsw_tr_new[i,15]=sum(Fsw_tr_new[i,0:15]*hpdf[0:15])
 
+            #end loop for SIT classse
             print('Mean under-ice PAR = ')
             print(nanmean(Fsw_tr_new[:,15]))
             sys.stdout.flush()    
@@ -205,9 +207,10 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
                 Fsw_TR_NEW=np.ma.array(Fsw_TR_NEW,mask=(isnan(flipud(H_S))==True))
                 T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
 #                print('shape of the under-ice PAR ',Fsw_TR_NEW.shape)
-                plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
-                fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
-                plt.savefig(fname,dpi=300)
+                
+        plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
+        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
+        plt.savefig(fname,dpi=300)      
     
     return(Fsw_TR_NEW,T_snow)
     
@@ -498,6 +501,7 @@ for f in sorted(models_with_all_variables):
         ncparts.append(one_file[:,irows])
         output.append( np.concatenate(ncparts) ) #append the entire 3-D array of this variable to the main empty list
  
+    #end loop for all variables
 
 #separate list into components
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
@@ -516,6 +520,8 @@ for f in sorted(models_with_all_variables):
     alb_april=swu_april/swd_april 
     # plot(alb_april[0,:,:],latsy,lonsx,'alb')
     model_name=f[6:35]
+
+#this is getting the under-ice light for all years for that particular month
     get_under_ice_light(sic_april,sit_april,snd_april,alb_april,swd_april,latsy,lonsx,model_name,yearstart)
     
     
