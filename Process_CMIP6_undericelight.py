@@ -90,7 +90,7 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
         year.append(iyears+yearstart)
         SIC=sic[iyears,:,:]
         f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
-        print('inside years loop for undericelight ',range(nyears),iyears,alb.shape)
+        # print('inside years loop for undericelight ',range(nyears),iyears,alb.shape)
     
 
     #### Snow depth ####
@@ -179,7 +179,7 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
 
         #end loop for SIT classse
 #       print('Mean under-ice PAR = ')
-        print(nanmean(Fsw_tr_new[:,15]))
+        # print(nanmean(Fsw_tr_new[:,15]))
         sys.stdout.flush()    
 
 # change shape to 2D array for map plotting
@@ -209,10 +209,10 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
             # T_snow=np.ma.array(T_snow,mask=(isnan(flipud(H_S))==True))
 
             
-        print('testing the size of the under-ice PAR and what year we are in ', Fsw_TR_NEW.shape, iyears, str(year[iyears]))
+        # print('testing the size of the under-ice PAR and what year we are in ', Fsw_TR_NEW.shape, iyears, str(year[iyears]))
                 
         plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
-        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
+        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_June_'+str(year[iyears])
         print('filename ',fname)
         plt.savefig(fname,dpi=300)     
     #end the loop on all years
@@ -512,25 +512,25 @@ for f in sorted(models_with_all_variables):
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
 #first let's test this for the month of April
     
-    sic_april=sic[3::12,:,:]/100. #start at month index of 3 (april) and skip every 12th value, convert to fraction
-    sit_april=sit[3::12,:,:]
-    snd_april=snd[3::12,:,:]
-    swu_april=swu[3::12,:,:]
-    swd_april=swd[3::12,:,:]
-    swd_april[swd_april>big_value]=np.nan #set big values to Nan
-    swu_april[swu_april>big_value]=0.
-    sit_april[sit_april>big_value]=np.nan
-    snd_april[snd_april>big_value]=np.nan
-    sic_april[sic_april>big_value]=np.nan
-    alb_april=swu_april/swd_april 
+    sic_one=sic[5::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
+    sit_one=sit[5::12,:,:]
+    snd_one=snd[5::12,:,:]
+    swu_one=swu[5::12,:,:]
+    swd_one=swd[5::12,:,:]
+    swd_one[swd_one>big_value]=np.nan #set big values to Nan
+    swu_one[swu_one>big_value]=0.
+    sit_one[sit_one>big_value]=np.nan
+    snd_one[snd_one>big_value]=np.nan
+    sic_one[sic_one>big_value]=np.nan
+    alb_one=swu_one/swd_one 
     # plot(alb_april[0,:,:],latsy,lonsx,'alb')
     model_name=f[6:35]
 
 #this is getting the under-ice light for all years for that particular month
-    get_under_ice_light(sic_april,sit_april,snd_april,alb_april,swd_april,latsy,lonsx,model_name,yearstart)
+    get_under_ice_light(sic_one,sit_one,snd_one,alb_one,swd_one,latsy,lonsx,model_name,yearstart)
     
     
-    break
+#    break
     # imon=3
     # for imon in range(len(months)):
     #     sic_mon=sic[imon::12,:,:]/100.
