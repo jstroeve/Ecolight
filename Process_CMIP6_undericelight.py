@@ -59,17 +59,83 @@ from matplotlib import ticker
 from scipy import optimize
 
 
+#%% LOAD Function
+import datetime as dt
+def output2Netcdf(data_slice,time,fn,itype,model_name):
+    # Get EASE grid lat/lon info
+    EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
+    lons_ease = np.array(EASE_grid['lon'])
+    lats_ease = np.array(EASE_grid['lat'])
+    
+#we will output all the under-ice par and transmittance in EASE-grid    
+    xdim=lats_ease.shape[0]
+    ydim=lats_ease.shape[1]
+    ncfile=Dataset(fn,'w',format='NETCDF4')
+    time_dim = ncfile.createDimension('time', None)  # unlimited length so it can be appended to
+    #create attributes
+    ncfile.title='Model data '+model_name
+    
+    lat_dim=ncfile.createDimension('lat_EASE',xdim)
+    lon_dim=ncfile.createDimension('lon_EASE',ydim)
+    
+    times=ncfile.createVariable('time','np.float64',('time',))
+    times.units='year since '+str(yearstart)
+    times.long_name='time'
+    lats = ncfile.createVariable('lat', 'np.float32', ('lat',))
+    lats.units='degrees_north'
+    lats.long_name='latitude'
+    lons = ncfile.createVariable('lon', 'np.float32', ('lon',))
+    lons.units='degrees_ease'
+    lons.long_name='longitude'
+    
+    #define a 3D variable to hold the data
+    if itype == 'trans':
+        value=ncfile.createVariable('transmissivity',np.float64,('time','lat','lon'),zlib='True')
+        value.units='None'
+        value.standard_name='Transmittance under sea ice'
+    elif itype == 'par':
+        value=ncfile.createVariable('PAR',np.float64,('time','lat','lon'),zlib='True')
+        value.units='micromoles per square meter per second'
+        value.standard_name='Under-ice PAR'
+    
+    value[:,:,:]=data_slice
+    times=time
+    ncfile.close(); print(fn+' data set is closed')
+    
+    # ds1=xr.Dataset( data_vars={'PAR':(['x','y'],Fsw_TR_NEW),
+    #                         'dXr':(['x','y'],dXr),
+    #                         'dYr':(['x','y'],dYr)},
+
+    #              coords =  {'lon':(['x','y'],ease_lons),
+    #                         'lat':(['x','y'],ease_lats)})
+    # ds2=xr.Dataset( data_vars={'Transmittance':(['x','y'],T_snow),
+    #                         'dXr':(['x','y'],dXr),
+    #                         'dYr':(['x','y'],dYr)},
+
+    #              coords =  {'lon':(['x','y'],ease_lons),
+    #                         'lat':(['x','y'],ease_lats)})
 
 
 #%% LOAD Function
 def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
 # #**********function to compute under-ice light*************
-
+    #create the output netCDF data sets
     nyears=sic.shape[0]
+    print('nyears ',nyears)
     year=[]
     big_value=1.e20
     xdim=sic.shape[1]
     ydim=sic.shape[2]
+
+    trans=np.empty[nyears,361,361]
+    par=np.empty[nyears,361,361]
+
+#since we want to put all data in EASE we need to load those lat/lons
+    # Get EASE grid
+    EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
+    lons_ease = np.array(EASE_grid['lon'])
+    lats_ease = np.array(EASE_grid['lat'])
+    
     print('xdim and ydim ',xdim,ydim,nyears)
 # surface transmission parameter
     i_0_snw  =  0.3;     # for snow 
@@ -210,14 +276,21 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
 
             
         # print('testing the size of the under-ice PAR and what year we are in ', Fsw_TR_NEW.shape, iyears, str(year[iyears]))
-                
-        plot(Fsw_TR_NEW,latsy,lonsx,'PAR')
+            
+        #regrid to EASE
+        Fsw_TR_EASE=regrid(Fsw_TR_NEW,lonsx,latsy,lons_ease,lats_ease)
+        T_snow_EASE=regrid(T_snow,lonsx,latsy,lons_ease,lats_ease)
+        par[iyears,:,:]=Fsw_TR_EASE
+        trans[iyears,:,:]=T_snow_EASE
+
+        plot(Fsw_TR_EASE,lats_ease,lons_ease,'PAR')
         fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_June_'+str(year[iyears])
         print('filename ',fname)
-        plt.savefig(fname,dpi=300)     
+        plt.savefig(fname,dpi=300)
+        
     #end the loop on all years
     
-#    return(Fsw_TR_NEW,T_snow)
+    return par,trans
     
     
 #function to regrid data to the same grid (this is a problem for the incoming and outgoing solar radiation fields)
@@ -363,7 +436,8 @@ subset_swd=[]
 for f in swd_files:
     s=f[11::]
     subset_swd.append(s)
-    
+
+ #%% LOAD Function   
 def get(inpath,string):
     if string == 'lon':
        ncf=nc.Dataset(inpath)
@@ -388,6 +462,7 @@ def get(inpath,string):
         ncf.close()
         return(time)
 
+#main body of code that loops through all models
 set_of_siconc_models = set(subset_sic)    
 set_of_sithick_models = set(subset_sit)
 set_of_snd_models = set(subset_snd)
@@ -490,7 +565,7 @@ for f in sorted(models_with_all_variables):
                 newlons.shape
                 newlats.shape
                 new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
-                print('filling new array with regridded data ',i)
+#                print('filling new array with regridded data ',i)
                 array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
                 i += 1
                 # break
@@ -512,11 +587,11 @@ for f in sorted(models_with_all_variables):
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
 #first let's test this for the month of April
     
-    sic_one=sic[5::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
-    sit_one=sit[5::12,:,:]
-    snd_one=snd[5::12,:,:]
-    swu_one=swu[5::12,:,:]
-    swd_one=swd[5::12,:,:]
+    sic_one=sic[3::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
+    sit_one=sit[3::12,:,:]
+    snd_one=snd[3::12,:,:]
+    swu_one=swu[3::12,:,:]
+    swd_one=swd[3::12,:,:]
     swd_one[swd_one>big_value]=np.nan #set big values to Nan
     swu_one[swu_one>big_value]=0.
     sit_one[sit_one>big_value]=np.nan
@@ -527,7 +602,9 @@ for f in sorted(models_with_all_variables):
     model_name=f[6:35]
 
 #this is getting the under-ice light for all years for that particular month
-    get_under_ice_light(sic_one,sit_one,snd_one,alb_one,swd_one,latsy,lonsx,model_name,yearstart)
+    par_model,trans_model = get_under_ice_light(sic_one,sit_one,snd_one,alb_one,swd_one,latsy,lonsx,model_name,yearstart)
+    fn_par='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
+    out2netcdf(par_model,time,fn_par,'par',model_name)
     
     
 #    break
