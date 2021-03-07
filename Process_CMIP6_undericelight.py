@@ -127,8 +127,8 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
     xdim=sic.shape[1]
     ydim=sic.shape[2]
 
-    transmittance=np.empty[nyears,361,361]
-    par=np.empty[nyears,361,361]
+    transmittance=np.empty((nyears,361,361))
+    par=np.empty((nyears,361,361))
 
 #since we want to put all data in EASE we need to load those lat/lons
     # Get EASE grid
