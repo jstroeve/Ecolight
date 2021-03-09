@@ -61,45 +61,44 @@ from scipy import optimize
 
 #%% LOAD Function
 import datetime as dt
-def output2Netcdf(data_slice,time,fn,itype,model_name):
-    # Get EASE grid lat/lon info
-    EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
-    lons_ease = np.array(EASE_grid['lon'])
-    lats_ease = np.array(EASE_grid['lat'])
-    
+def output2Netcdf(data_slice,modeltime,fn,itype,model_name):
+    try: ncfile.close()
+    except: pass
 #we will output all the under-ice par and transmittance in EASE-grid    
-    xdim=lats_ease.shape[0]
-    ydim=lats_ease.shape[1]
-    ncfile=Dataset(fn,'w',format='NETCDF4')
-    time_dim = ncfile.createDimension('time', None)  # unlimited length so it can be appended to
-    #create attributes
+    xdim=361
+    ydim=361
+    
+    ncfile=Dataset(fn,'a',format='NETCDF4')
     ncfile.title='Model data '+model_name
     
-    lat_dim=ncfile.createDimension('lat_EASE',xdim)
-    lon_dim=ncfile.createDimension('lon_EASE',ydim)
+    #first create dimensions
+    time_dim = ncfile.createDimension("time", None)  # can be appended to
+    lat_dim=ncfile.createDimension("lat_EASE",xdim)
+    lon_dim=ncfile.createDimension("lon_EASE",ydim)
     
-    times=ncfile.createVariable('time','np.float64',('time',))
+    #create variables
+    times=ncfile.createVariable("time","f4",("time",))
     times.units='year since '+str(yearstart)
     times.long_name='time'
-    lats = ncfile.createVariable('lat', 'np.float32', ('lat',))
-    lats.units='degrees_north'
-    lats.long_name='latitude'
-    lons = ncfile.createVariable('lon', 'np.float32', ('lon',))
-    lons.units='degrees_ease'
-    lons.long_name='longitude'
+    latitudes = ncfile.createVariable("lat", "f4", ("lat",))
+    lat.units='degrees_north'
+    lat.long_name='latitude'
+    longitudes = ncfile.createVariable("lon", "f4", ("lon",))
+    lon.units='degrees_ease'
+    lon.long_name='longitude'
     
     #define a 3D variable to hold the data
     if itype == 'trans':
-        value=ncfile.createVariable('transmissivity',np.float64,('time','lat','lon'),zlib='True')
-        value.units='None'
+        value=ncfile.createVariable("transmissivity","f4",("time","lat","lon"),zlib='True')
+        value.units="None"
         value.standard_name='Transmittance under sea ice'
     elif itype == 'par':
-        value=ncfile.createVariable('PAR',np.float64,('time','lat','lon'),zlib='True')
+        value=ncfile.createVariable("PAR","f4",("time","lat","lon"),zlib='True')
         value.units='micromoles per square meter per second'
         value.standard_name='Under-ice PAR'
     
     value[:,:,:]=data_slice
-    times=time
+    times=modeltime
     ncfile.close(); print(fn+' data set is closed')
     
     # ds1=xr.Dataset( data_vars={'PAR':(['x','y'],Fsw_TR_NEW),
@@ -281,10 +280,10 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
         Fsw_TR_EASE=regrid(Fsw_TR_NEW,lonsx,latsy,lons_ease,lats_ease)
         T_snow_EASE=regrid(T_snow,lonsx,latsy,lons_ease,lats_ease)
         par[iyears,:,:]=Fsw_TR_EASE
-        trans[iyears,:,:]=T_snow_EASE
+        transmittance[iyears,:,:]=T_snow_EASE
 
         plot(Fsw_TR_EASE,lats_ease,lons_ease,'PAR')
-        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_June_'+str(year[iyears])
+        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
         print('filename ',fname)
         plt.savefig(fname,dpi=300)
         
@@ -497,16 +496,16 @@ for f in sorted(models_with_all_variables):
     latsy=lats[irows,:]
        
 #Establish Time Units                
-    timeslen = get(inpath,'time')
-    print('Establish time units ',timeslen)
+    # timeslen = get(inpath,'time')
+    # print('Establish time units ',timeslen)
     
 #for some reason this num2date doesn't work though it should according to the guide docs
     # time=ncf.variables['time']
     # time_convert=num2date(time[:],time.units, time.calendar)
     #instead use xarray to get the start year 
     f1=xr.open_dataset(inpath) #can just read the first file name for this
-    time=f1.time #this gives an array of all the times
-    timestart=time.values[0]
+    modeltime=f1.time #this gives an array of all the times
+    timestart=modeltime.values[0]
     #extract out the year now
     yearstart=pd.to_datetime(timestart).year
           
@@ -603,8 +602,9 @@ for f in sorted(models_with_all_variables):
 
 #this is getting the under-ice light for all years for that particular month
     par_model,trans_model = get_under_ice_light(sic_one,sit_one,snd_one,alb_one,swd_one,latsy,lonsx,model_name,yearstart)
-    fn_par='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
-    out2netcdf(par_model,time,fn_par,'par',model_name)
+    fn_par='/Users/stroeve/Documents/IPCC/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
+    output2Netcdf(par_model,modeltime,fn_par,'par',model_name)
+    break
     
     
 #    break
