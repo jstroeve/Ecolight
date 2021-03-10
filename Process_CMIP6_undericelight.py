@@ -283,9 +283,10 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
         transmittance[iyears,:,:]=T_snow_EASE
 
         plot(Fsw_TR_EASE,lats_ease,lons_ease,'PAR')
-        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
+        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_March_'+str(year[iyears])
         print('filename ',fname)
         plt.savefig(fname,dpi=300)
+        plt.close()
         
     #end the loop on all years
     
@@ -473,7 +474,12 @@ models_with_all_variables = (set_of_siconc_models & set_of_sithick_models & set_
 big_value=1.e18 
 output=[]
 
-import numpy as np
+# Get EASE grid
+EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
+lons_ease = np.array(EASE_grid['lon'])
+lats_ease = np.array(EASE_grid['lat'])
+    
+
 for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
 #get the latitude/longitude using the first file from the siconc to set the latitude/longitude
@@ -586,25 +592,32 @@ for f in sorted(models_with_all_variables):
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
 #first let's test this for the month of April
     
-    sic_one=sic[3::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
-    sit_one=sit[3::12,:,:]
-    snd_one=snd[3::12,:,:]
-    swu_one=swu[3::12,:,:]
-    swd_one=swd[3::12,:,:]
+    sic_one=sic[2::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
+    sit_one=sit[2::12,:,:]
+    snd_one=snd[2::12,:,:]
+    swu_one=swu[2::12,:,:]
+    swd_one=swd[2::12,:,:]
     swd_one[swd_one>big_value]=np.nan #set big values to Nan
     swu_one[swu_one>big_value]=0.
     sit_one[sit_one>big_value]=np.nan
     snd_one[snd_one>big_value]=np.nan
     sic_one[sic_one>big_value]=np.nan
     alb_one=swu_one/swd_one 
+    times_one=modeltime[2::12]
     # plot(alb_april[0,:,:],latsy,lonsx,'alb')
     model_name=f[6:35]
 
 #this is getting the under-ice light for all years for that particular month
     par_model,trans_model = get_under_ice_light(sic_one,sit_one,snd_one,alb_one,swd_one,latsy,lonsx,model_name,yearstart)
-    fn_par='/Users/stroeve/Documents/IPCC/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
-    output2Netcdf(par_model,modeltime,fn_par,'par',model_name)
-    break
+#    fn_par='/Users/stroeve/Documents/IPCC/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
+    fn_par='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
+    fn_trans='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_transmittance.nc'
+    ds1=xr.Dataset(data_vars={'par':(['time','x','y'],par_model)},coords =  {'lon':(['x','y'],lons_ease),'lat':(['x','y'],lats_ease),'time':(['time'],times_one)})
+    ds2=xr.Dataset(data_vars={'transmittance':(['time','x','y'],trans_model)},coords =  {'lon':(['x','y'],lons_ease),'lat':(['x','y'],lats_ease),'time':(['time'],times_one)})
+    ds1.to_netcdf(fn_par)
+    ds2.to_netcdf(fn_trans)
+ #   output2Netcdf(par_model,times_one,fn_par,'par',model_name)
+    #break
     
     
 #    break
