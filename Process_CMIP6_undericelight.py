@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm2
 
 import cftime
+from cftime import DatetimeNoLeap
 
 import cartopy.crs as ccrs
 
@@ -480,7 +481,12 @@ lons_ease = np.array(EASE_grid['lon'])
 lats_ease = np.array(EASE_grid['lat'])
     
 
-for f in sorted(models_with_all_variables):
+#convert set to list
+model_list=list(models_with_all_variables)
+model_list.sort()
+
+for f in model_list[3:]:
+# for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
 #get the latitude/longitude using the first file from the siconc to set the latitude/longitude
     inpath=datapath+ncvarlist[0]+'_'+f
@@ -510,10 +516,16 @@ for f in sorted(models_with_all_variables):
     # time_convert=num2date(time[:],time.units, time.calendar)
     #instead use xarray to get the start year 
     f1=xr.open_dataset(inpath) #can just read the first file name for this
-    modeltime=f1.time #this gives an array of all the times
-    timestart=modeltime.values[0]
-    #extract out the year now
-    yearstart=pd.to_datetime(timestart).year
+        #extract out the year 
+    try:
+        modeltime=f1.time #this gives an array of all the times
+        timestart=modeltime.values[0]
+        yearstart=pd.to_datetime(timestart).year     
+    except:
+        modeltime=f1.indexes['time'].to_datetimeindex() 
+        timestart=modeltime.values[0]
+        yearstart=pd.to_datetime(timestart).year
+    
           
     
     
