@@ -25,7 +25,7 @@ from scipy.interpolate import griddata
 
 #these are needed for plotting
 import matplotlib as mpl
-from mpl_toolkits.basemap import Basemap
+# from mpl_toolkits.basemap import Basemap
 import matplotlib.colors as colors
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
@@ -34,6 +34,7 @@ import matplotlib.cm as cm2
 import cftime
 from cftime import DatetimeNoLeap
 
+import cartopy
 import cartopy.crs as ccrs
 
 #from cftime import num2date, date2num
@@ -154,6 +155,7 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
     hpdf=np.asarray(hpdf)
     for iyears in range(nyears):        ## big loop on years (could also have been on months as Gaelle did)
         year.append(iyears+yearstart)
+        print('processing year ',iyears+yearstart)
         SIC=sic[iyears,:,:]
         f_bi=reshape(SIC,xdim*ydim)      ## re-shape sea ice concentration as 1D array for loop
         # print('inside years loop for undericelight ',range(nyears),iyears,alb.shape)
@@ -283,11 +285,11 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
         par[iyears,:,:]=Fsw_TR_EASE
         transmittance[iyears,:,:]=T_snow_EASE
 
-        plot(Fsw_TR_EASE,lats_ease,lons_ease,'PAR')
-        fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
-        print('filename ',fname)
-        plt.savefig(fname,dpi=300)
-        plt.close()
+        # plot(Fsw_TR_EASE,lats_ease,lons_ease,'PAR')
+        # fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
+        # print('filename ',fname)
+        # plt.savefig(fname,dpi=300)
+        # plt.close()
         
     #end the loop on all years
     
@@ -357,27 +359,38 @@ def plot(data,latsy,lonsx,string):
         minv=0
         maxv=1.0
         
-#    print('inside plot routine ',latsy.shape,lonsx.shape,data.shape)
-    lat_0 = 90 # Latitude of Origin
-    lon_0 = -45 # Central Meridian
-#bbox = [45,-180.,90,180.] # Bounding Box
-    bbox = [45,-45,45,35]
+#switch to using cartopy for plotting
     fig=plt.figure(figsize=(6.5,6.5))
-    ax = fig.add_subplot() 
-    mp = Basemap(projection='npstere',boundinglat=60,lon_0=0,resolution='l') # choice of lat, lon boundariessic
-    mp.fillcontinents(color='white',lake_color='white')
-    mp.drawcoastlines()
-    mp.drawparallels(np.arange(-80.,81.,20.))
-    mp.drawmeridians(np.arange(-180.,181.,20.))
-    mp.drawmapboundary(fill_color='white') 
-#    print('min and max values and step ',minv,maxv,(maxv-minv)/10.)
-    cf1 = mp.contourf(lonsx, latsy, data, np.arange(minv,maxv,(maxv-minv)/10.), latlon=True, cmap=plt.cm.viridis, extend='both')
-# Add an annotation for each sub-plot
-    box = dict(boxstyle='square,pad=0.3',fc='white',ec='white',lw=0.5) # white rectangle with white outline
-    ax.annotate(string, xy=(0.02,0.96), xycoords='axes fraction', va='top', ha= 'left', size=8, bbox=box)
-# # The above adds text plotted on top of the white box located in the upper-left corner of each map
-    hc=plt.colorbar(cf1,);  
-    hc.set_label(label_unit,size=12);
+    ax=plt.axes(projection=ccrs.NorthPolarStereo())
+    ax.set_extent([-180,180,90,66],ccrs.PlateCarree())
+    ax.add_feature(cartopy.feature.LAND, edgecolor='black',zorder=1)
+    
+    bg=ax.pcolormesh(lonsx,latsy,data[:-1,:-1],vmin=minv,vmax=maxv,transform=ccrs.PlateCarree(),cmap='plasma')
+    cb=fig.colorbar(gb,orientation='vertical',shrink=1)
+    cb.set_label(label_unit,fontsize='x-large')
+        
+# #    print('inside plot routine ',latsy.shape,lonsx.shape,data.shape)
+#     lat_0 = 90 # Latitude of Origin
+#     lon_0 = -45 # Central Meridian
+# #bbox = [45,-180.,90,180.] # Bounding Box
+#     bbox = [45,-45,45,35]
+#     fig=plt.figure(figsize=(6.5,6.5))
+#     ax = fig.add_subplot() 
+#     mp = Basemap(projection='npstere',boundinglat=60,lon_0=0,resolution='l') # choice of lat, lon boundariessic
+#     mp.fillcontinents(color='white',lake_color='white')
+#     mp.drawcoastlines()
+#     mp.drawparallels(np.arange(-80.,81.,20.))
+#     mp.drawmeridians(np.arange(-180.,181.,20.))
+#     mp.drawmapboundary(fill_color='white') 
+# #    print('min and max values and step ',minv,maxv,(maxv-minv)/10.)
+#     cf1 = mp.contourf(lonsx, latsy, data, np.arange(minv,maxv,(maxv-minv)/10.), latlon=True, cmap=plt.cm.viridis, extend='both')
+# # Add an annotation for each sub-plot
+#     box = dict(boxstyle='square,pad=0.3',fc='white',ec='white',lw=0.5) # white rectangle with white outline
+#     ax.annotate(string, xy=(0.02,0.96), xycoords='axes fraction', va='top', ha= 'left', size=8, bbox=box)
+    
+# # # The above adds text plotted on top of the white box located in the upper-left corner of each map
+#     hc=plt.colorbar(cf1,);  
+#     hc.set_label(label_unit,size=12);
 
 #this program will run through an emission scenario to find the models to compute under-ice light following Stroeve et al. 2021
 #the light processing component is calling a function based off of Gaelle's work
@@ -452,11 +465,11 @@ def get(inpath,string):
     elif string == 'lat':
         ncf=nc.Dataset(inpath)
         try:
-          lons=ncf.variables['lat'][:].data 
+          lats=ncf.variables['lat'][:].data 
         except:
-          lons=ncf.variables['latitude'][:].data
+          lats=ncf.variables['latitude'][:].data
         ncf.close()
-        return(lons)
+        return(lats)
     elif string == 'time':
         ncf=nc.Dataset(inpath)
         timeslen = ncf['time'].shape[0]
@@ -473,7 +486,7 @@ set_of_swd_models = set(subset_swd)
 models_with_all_variables = (set_of_siconc_models & set_of_sithick_models & set_of_snd_models & set_of_swu_models & set_of_swd_models) # Find intersection of sets
 
 big_value=1.e18 
-output=[]
+
 
 # Get EASE grid
 EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
@@ -486,7 +499,8 @@ model_list=list(models_with_all_variables)
 model_list.sort()
 
 month=['January','February','March','April','May','June']
-for f in model_list[4:]:
+
+for f in model_list[0:]:
 # for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
 #get the latitude/longitude using the first file from the siconc to set the latitude/longitude
@@ -527,8 +541,7 @@ for f in model_list[4:]:
         timestart=modeltime.values[0]
         yearstart=pd.to_datetime(timestart).year
     
-          
-    
+    output=[]
     
 # now loop over all the variables per model/ensemble
     for ncvar in ncvarlist: #loop through each variable name
@@ -538,62 +551,54 @@ for f in model_list[4:]:
         ncf=nc.Dataset(files2open)
         
         #testing with xarray
-        test=xr.open_dataset(files2open)
-        test_var=test[ncvar].values
+        # test=xr.open_dataset(files2open)
+        # test_var=test[ncvar].values
     
-
         print('processing variable ',ncvar, ' ', ncf[ncvar].shape)
         one_file=ncf[ncvar]
+        
+        #we first just check the shape in order to regrid if neccesary
         one_year=one_file[0,:,:]
-        #if snow is in cm, need to convert to m
-        if (ncvar == 'sisnthick'):
-            if (one_year.max() > 10.0 ) :
-                one_year=one_year/100.
-        
-        
+                     
         if (one_year.shape != lats.shape): #this seems to happen to the incoming solar/outgoing solar radiation
             print('in test for lat/lon ',files2open)
             newlats=get(files2open,'lat')
             newlons=get(files2open,'lon')
               
-            #do this if the lats are 1-d arrays instead of 2-d
+        #do this if the lats are 1-d arrays instead of 2-d
             if newlats.ndim == 1:
                 print('needing to convert to 2D array')
                 newlons, newlats = np.meshgrid(newlons,newlats)
                 newlats[(newlats > 90) | (newlats < -90)] = np.nan
                 newlons[(newlons > 360) | (newlons < -360)] = np.nan
-
-#convert lons to -180 to 180
-            newlons = np.where(newlons > 180, newlons-360, newlons) # This replaces any lon greater than 180 with lons-360 (so -180 to 0)
+                #convert lons to -180 to 180
+                newlons = np.where(newlons > 180, newlons-360, newlons) # This replaces any lon greater than 180 with lons-360 (so -180 to 0)
             
-
-            i=0
-            #print(len(ncf[ncvar]))
-            print(len(one_file))
-            t=one_file.shape[0]
-            x=lats.shape[0]
-            y=lats.shape[1]
-            array_to_fill=np.empty((t,x,y))
+        i=0  #now we will have to fill the arrays 
+        #print(len(ncf[ncvar]))
+        print(len(one_file))
+        t=one_file.shape[0]
+        x=lats.shape[0]
+        y=lats.shape[1]
+        array_to_fill=np.empty((t,x,y))  #we fill an array as a function of time, lon,lat
             
-            while i < len(one_file):
-                #one_file=dum[i,:,:]
-                one_year=one_file[i,:,:]
-                one_year=np.absolute(one_year) #for some reason MPI has negative sisflswutop and siflswdtop
-                
+        while i < len(one_file):  #loop over each month/year
+            one_year=one_file[i,:,:]  #extract out 2D array
+ #           print('within length of one_file ',i)
+                    
+            one_year=np.absolute(one_year) #for some reason MPI has negative sisflswutop and siflswdtop
+            if (one_year.shape != lats.shape): #now replace the one_file with the regridded data if we need to convert swu and swd
                 newlons.shape
                 newlats.shape
                 new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
-#                print('filling new array with regridded data ',i)
                 array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
-                i += 1
-                # break
-        if (one_year.shape != lats.shape): #now replace the one_file with the regridded data if we need to convert swu and swd
-            one_file=array_to_fill
+                one_file=array_to_fill   
+
+            i += 1
+                       
         # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])  #note this gives 1850 
-        
-        
-        
+                     
         #load each part of the data for this variable
         # ncparts.append(ncf[ncvar][:,irows].data)
         ncparts.append(one_file[:,irows])
@@ -603,6 +608,11 @@ for f in model_list[4:]:
 
 #separate list into components
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
+    
+    #if snow depth is in cm we have to convert to meters
+    if (snd.max() > 10.0 ) :
+        snd=snd/100.
+    
 #first let's test this for the month of April
     imon=3
     sic_one=sic[3::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
@@ -623,8 +633,8 @@ for f in model_list[4:]:
 #this is getting the under-ice light for all years for that particular month
     par_model,trans_model = get_under_ice_light(sic_one,sit_one,snd_one,alb_one,swd_one,latsy,lonsx,model_name,yearstart)
 #    fn_par='/Users/stroeve/Documents/IPCC/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR.nc'
-    fn_par='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR_'+month[imon]+'.nc'
-    fn_trans='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_transmittance_'+month[imon]+'.nc'
+    fn_par='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_PAR_'+month[imon]+'_'+str(yearstart)+'.nc'
+    fn_trans='/Volumes/LaCie/CMIP6/Ecolight/'+experiment[1]+'/'+model_name+'_transmittance_'+month[imon]+'_'+str(yearstart)+'.nc'
     ds1=xr.Dataset(data_vars={'par':(['time','x','y'],par_model)},coords =  {'lon':(['x','y'],lons_ease),'lat':(['x','y'],lats_ease),'time':(['time'],times_one)})
     ds2=xr.Dataset(data_vars={'transmittance':(['time','x','y'],trans_model)},coords =  {'lon':(['x','y'],lons_ease),'lat':(['x','y'],lats_ease),'time':(['time'],times_one)})
     ds1.to_netcdf(fn_par)
