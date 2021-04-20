@@ -261,8 +261,8 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
                 T_snow[ii,jj]=t_s_hom[c,15]
                 Fsw_TR_NEW[ii,jj]=Fsw_tr_new[c,15]
 
-            #T_snow=flipud(T_snow)
-            #Fsw_TR_NEW=flipud(Fsw_TR_NEW)
+            T_snow=flipud(T_snow)
+            Fsw_TR_NEW=flipud(Fsw_TR_NEW)
 
     
         c=-1
@@ -278,13 +278,14 @@ def get_under_ice_light(sic,sit,snd,alb,swd,latsy,lonsx,modelname,yearstart):
 
             
         # print('testing the size of the under-ice PAR and what year we are in ', Fsw_TR_NEW.shape, iyears, str(year[iyears]))
-            
+        plt.imshow(Fsw_TR_NEW) 
         #regrid to EASE
         Fsw_TR_EASE=regrid(Fsw_TR_NEW,lonsx,latsy,lons_ease,lats_ease)
         T_snow_EASE=regrid(T_snow,lonsx,latsy,lons_ease,lats_ease)
         par[iyears,:,:]=Fsw_TR_EASE
         transmittance[iyears,:,:]=T_snow_EASE
-
+        
+        plt.imshow(Fsw_TR_EASE)
         # plot(Fsw_TR_EASE,lats_ease,lons_ease,'PAR')
         # fname='/Volumes/Lacie/CMIP6/Ecolight/UnderIcePAR_'+modelname+'_April_'+str(year[iyears])
         # print('filename ',fname)
@@ -365,7 +366,7 @@ def plot(data,latsy,lonsx,string):
     ax.set_extent([-180,180,90,66],ccrs.PlateCarree())
     ax.add_feature(cartopy.feature.LAND, edgecolor='black',zorder=1)
     
-    bg=ax.pcolormesh(lonsx,latsy,data[:-1,:-1],vmin=minv,vmax=maxv,transform=ccrs.PlateCarree(),cmap='plasma')
+    bg=ax.pcolormesh(lonsx,latsy,data,vmin=minv,vmax=maxv,transform=ccrs.PlateCarree(),cmap='plasma')
     cb=fig.colorbar(gb,orientation='vertical',shrink=1)
     cb.set_label(label_unit,fontsize='x-large')
         
@@ -475,41 +476,39 @@ def get(inpath,string):
         timeslen = ncf['time'].shape[0]
         ncf.close()
         return(time)
-
+    
+#****************************************************
 #main body of code that loops through all models
 set_of_siconc_models = set(subset_sic)    
 set_of_sithick_models = set(subset_sit)
 set_of_snd_models = set(subset_snd)
 set_of_swu_models = set(subset_swu)
 set_of_swd_models = set(subset_swd) 
+
 #this finds a set of all models/ensemble runs that are there for each variable
 models_with_all_variables = (set_of_siconc_models & set_of_sithick_models & set_of_snd_models & set_of_swu_models & set_of_swd_models) # Find intersection of sets
-
-big_value=1.e18 
-
-
-# Get EASE grid
-EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
-lons_ease = np.array(EASE_grid['lon'])
-lats_ease = np.array(EASE_grid['lat'])
-    
-
 #convert set to list
 model_list=list(models_with_all_variables)
 model_list.sort()
 
+big_value=1.e18
+    
+# Get EASE grid
+EASE_grid = Dataset('/Users/stroeve/Documents/seaice/grid.nc')
+lons_ease = np.array(EASE_grid['lon'])
+lats_ease = np.array(EASE_grid['lat'])
+
 month=['January','February','March','April','May','June']
 
-for f in model_list[0:]:
+for f in model_list[0:1]:
 # for f in sorted(models_with_all_variables):
     print('proccessing model ',f)
-#get the latitude/longitude using the first file from the siconc to set the latitude/longitude
-    inpath=datapath+ncvarlist[0]+'_'+f
-    
+#get the latitude/longitude using the first file from the siconc to set the latitude/longitude for all variables
+    inpath=datapath+ncvarlist[0]+'_'+f   
     lats=get(inpath,'lat')
     lons=get(inpath,'lon')
             
-#do this if the lats are 1-d arrays instead of 2-d
+#do this if the lats and lons are 1-d arrays instead of 2-d
     if lats.ndim == 1:
         lons, lats = np.meshgrid(lons,lats)
     lats[(lats > 90) | (lats < -90)] = np.nan
@@ -518,10 +517,11 @@ for f in model_list[0:]:
 #convert lons to -180 to 180
     lons = np.where(lons > 180, lons-360, lons) # This replaces any lon greater than 180 with lons-360 (so -180 to 0)
 
+#find all indices for NH so as not to run the code for all pixels
     irows = np.unique(np.where((np.isfinite(lats) == 1) & (lats >= minlat))[0])
     lonsx=lons[irows,:]
     latsy=lats[irows,:]
-       
+    
 #Establish Time Units                
     # timeslen = get(inpath,'time')
     # print('Establish time units ',timeslen)
@@ -541,8 +541,7 @@ for f in model_list[0:]:
         timestart=modeltime.values[0]
         yearstart=pd.to_datetime(timestart).year
     
-    output=[]
-    
+    output=[]  #declare array that all variables will be stored in to extract from later
 # now loop over all the variables per model/ensemble
     for ncvar in ncvarlist: #loop through each variable name
         files2open=datapath+ncvar+'_'+f
@@ -555,16 +554,14 @@ for f in model_list[0:]:
         # test_var=test[ncvar].values
     
         print('processing variable ',ncvar, ' ', ncf[ncvar].shape)
-        one_file=ncf[ncvar]
+        one_file=ncf[ncvar]  #this is an array of time x lon x lat
         
         #we first just check the shape in order to regrid if neccesary
-        one_year=one_file[0,:,:]
-                     
+        one_year=one_file[0,:,:]                     
         if (one_year.shape != lats.shape): #this seems to happen to the incoming solar/outgoing solar radiation
             print('in test for lat/lon ',files2open)
             newlats=get(files2open,'lat')
-            newlons=get(files2open,'lon')
-              
+            newlons=get(files2open,'lon')             
         #do this if the lats are 1-d arrays instead of 2-d
             if newlats.ndim == 1:
                 print('needing to convert to 2D array')
@@ -574,33 +571,28 @@ for f in model_list[0:]:
                 #convert lons to -180 to 180
                 newlons = np.where(newlons > 180, newlons-360, newlons) # This replaces any lon greater than 180 with lons-360 (so -180 to 0)
             
-        i=0  #now we will have to fill the arrays 
-        #print(len(ncf[ncvar]))
-        print(len(one_file))
-        t=one_file.shape[0]
-        x=lats.shape[0]
-        y=lats.shape[1]
-        array_to_fill=np.empty((t,x,y))  #we fill an array as a function of time, lon,lat
+            i=0  #now we will have to fill the array if the data has to be regridded 
+            t=one_file.shape[0]
+            x=lats.shape[0]
+            y=lats.shape[1]
+            array_to_fill=np.empty((t,x,y))  #we fill an array as a function of time, lon,lat
             
-        while i < len(one_file):  #loop over each month/year
-            one_year=one_file[i,:,:]  #extract out 2D array
- #           print('within length of one_file ',i)
-                    
-            one_year=np.absolute(one_year) #for some reason MPI has negative sisflswutop and siflswdtop
-            if (one_year.shape != lats.shape): #now replace the one_file with the regridded data if we need to convert swu and swd
-                newlons.shape
-                newlats.shape
-                new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
-                array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
-                one_file=array_to_fill   
+            while i < len(one_file):  #loop over each month/year
+                one_year=one_file[i,:,:]  #extract out 2D array for each year                   
+                one_year=np.absolute(one_year) #for some reason MPI has negative sisflswutop and siflswdtop
+                if (one_year.shape != lats.shape): #now replace the one_file with the regridded data if we need to convert swu and swd
+                    newlons.shape
+                    newlats.shape
+                    new_data=regrid(one_year,newlons,newlats,lons,lats)  #regrid the data for incoming and outgoing solar to the sea ice fields
+                    array_to_fill[i]=new_data #now reassign the regridded one_year data back to the one_file array for that variable
+                    one_file=array_to_fill   
 
-            i += 1
+                i += 1
                        
         # plot(one_year,lats,lons,ncvar)
         ncstart=int(ncf['time'].units.strip('days since ')[0:4])  #note this gives 1850 
                      
         #load each part of the data for this variable
-        # ncparts.append(ncf[ncvar][:,irows].data)
         ncparts.append(one_file[:,irows])
         output.append( np.concatenate(ncparts) ) #append the entire 3-D array of this variable to the main empty list
  
@@ -609,24 +601,33 @@ for f in model_list[0:]:
 #separate list into components
     sic,sit,snd,swu,swd=output[0], output[1], output[2], output[3], output[4] 
     
+    #convert sic to fraction
+    sic=sic/100.
+    #set big values to NaN
+    sic[sic>big_value]=np.nan
+    sit[sit>big_value]=np.nan
+    snd[snd>big_value]=np.nan
+    swd[swd>big_value]=np.nan
+    swu[swu>big_value]=np.nan
     #if snow depth is in cm we have to convert to meters
     if (snd.max() > 10.0 ) :
+        print('need to convert snow depth to m ',snd.max())
         snd=snd/100.
     
 #first let's test this for the month of April
     imon=3
-    sic_one=sic[3::12,:,:]/100. #start at month index of 3/4 (april/May) and skip every 12th value, convert to fraction
-    sit_one=sit[3::12,:,:]
-    snd_one=snd[3::12,:,:]
-    swu_one=swu[3::12,:,:]
-    swd_one=swd[3::12,:,:]
-    swd_one[swd_one>big_value]=np.nan #set big values to Nan
-    swu_one[swu_one>big_value]=0.
-    sit_one[sit_one>big_value]=np.nan
-    snd_one[snd_one>big_value]=np.nan
-    sic_one[sic_one>big_value]=np.nan
+    sic_one=sic[imon::12,:,:] #start at month index of 3/4 (april/May) and skip every 12th value
+    sit_one=sit[imon::12,:,:]
+    snd_one=snd[imon::12,:,:]
+    swu_one=swu[imon::12,:,:]
+    swd_one=swd[imon::12,:,:]
+#    swd_one[swd_one>big_value]=np.nan #set big values to Nan
+    # swu_one[swu_one>big_value]=0.
+    # sit_one[sit_one>big_value]=np.nan
+    # snd_one[snd_one>big_value]=np.nan
+    # sic_one[sic_one>big_value]=np.nan
     alb_one=swu_one/swd_one 
-    times_one=modeltime[3::12]
+    times_one=modeltime[imon::12]
     # plot(alb_april[0,:,:],latsy,lonsx,'alb')
     model_name=f[6:35]
 
@@ -639,7 +640,7 @@ for f in model_list[0:]:
     ds2=xr.Dataset(data_vars={'transmittance':(['time','x','y'],trans_model)},coords =  {'lon':(['x','y'],lons_ease),'lat':(['x','y'],lats_ease),'time':(['time'],times_one)})
     ds1.to_netcdf(fn_par)
     ds2.to_netcdf(fn_trans)
- #   output2Netcdf(par_model,times_one,fn_par,'par',model_name)
+  #   output2Netcdf(par_model,times_one,fn_par,'par',model_name)
     #break
     
     
